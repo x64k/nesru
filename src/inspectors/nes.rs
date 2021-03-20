@@ -115,19 +115,27 @@ impl AnalysisContext for NESContext {
 
         let bend = u32::from(bstart) + INES_PRG_BANK_SIZE;
 
-        let blen = match usize::try_from(bstart + bend) {
+        if bstart > bend || bend - bstart < 4 {
+            return Err(Error::new(ErrorKind::Other, "Invalid ROM memory layout"));
+        }
+
+        let blast = match usize::try_from(bstart + bend) {
             Ok(e) => e,
             Err(_) => return Err(Error::new(ErrorKind::UnexpectedEof, "Invalid bank number")),
         };
 
-        if blen > self.map.len() {
+        if blast > self.map.len() {
             return Err(Error::new(ErrorKind::UnexpectedEof, "Invalid bank number"));
         }
 
         let mut empty = 0;
-        for i in bstart as usize..bend as usize {
-            if self.map[i] == self.empty {
-                empty += 1;
+        let qwords = self.map.chunks(4)
+            .skip((bstart / 4) as usize)
+            .take((bend - bstart) as usize / 4);
+
+        for qw in qwords {
+            if qw == [self.empty, self.empty, self.empty, self.empty] {
+                empty += 4;
             }
         }
             
